@@ -15,9 +15,13 @@ from ensemble_creation.rdc_based import candidate_evaluation
 from evaluation.confidence_interval_evaluation import evaluate_confidence_intervals
 from schemas.flights.schema import gen_flights_1B_schema
 from schemas.imdb.schema import gen_job_light_imdb_schema
+from schemas.imdb.schema import gen_imdb_schema
 from schemas.ssb.schema import gen_500gb_ssb_schema
 from schemas.tpc_ds.schema import gen_1t_tpc_ds_schema
+from schemas.stats.schema import gen_stats_schema, gen_stats_light_schema
+import warnings
 
+warnings.filterwarnings('ignore')
 np.random.seed(1)
 
 if __name__ == '__main__':
@@ -69,6 +73,7 @@ if __name__ == '__main__':
     parser.add_argument('--evaluate_cardinalities_scale', help='Evaluates SPN ensemble to compute cardinalities',
                         action='store_true')
     parser.add_argument('--evaluate_aqp_queries', help='Evaluates SPN ensemble for AQP', action='store_true')
+    parser.add_argument('--evaluate_single_queries', action='store_true')
     parser.add_argument('--against_ground_truth', help='Computes ground truth for AQP', action='store_true')
     parser.add_argument('--evaluate_confidence_intervals',
                         help='Evaluates SPN ensemble and compares stds with true stds', action='store_true')
@@ -79,7 +84,7 @@ if __name__ == '__main__':
                                  '../ssb-benchmark/spn_ensembles/ensemble_relationships_ssb-500gb_10000000.pkl'])
     parser.add_argument('--query_file_location', default='./benchmarks/ssb/sql/cardinality_queries.sql')
     parser.add_argument('--ground_truth_file_location',
-                        default='./benchmarks/ssb/sql/cardinality_true_cardinalities_100GB.csv')
+                        default=None)
     parser.add_argument('--database_name', default=None)
     parser.add_argument('--target_path', default='../ssb-benchmark/results')
     parser.add_argument('--raw_folder', default='../ssb-benchmark/results')
@@ -115,12 +120,18 @@ if __name__ == '__main__':
     table_csv_path = args.csv_path + '/{}.csv'
     if args.dataset == 'imdb-light':
         schema = gen_job_light_imdb_schema(table_csv_path)
+    elif args.dataset == 'imdb':
+        schema = gen_imdb_schema(table_csv_path)
     elif args.dataset == 'ssb-500gb':
         schema = gen_500gb_ssb_schema(table_csv_path)
     elif args.dataset == 'flights1B':
         schema = gen_flights_1B_schema(table_csv_path)
     elif args.dataset == 'tpc-ds-1t':
         schema = gen_1t_tpc_ds_schema(table_csv_path)
+    elif args.dataset == 'stats':
+        schema = gen_stats_schema(table_csv_path)
+    elif args.dataset == 'stats-light':
+        schema = gen_stats_light_schema(table_csv_path)
     else:
         raise ValueError('Dataset unknown')
 
@@ -218,6 +229,16 @@ if __name__ == '__main__':
         from evaluation.cardinality_evaluation import compute_ground_truth
 
         compute_ground_truth(args.query_file_location, args.target_path, args.database_name)
+
+    if args.evaluate_single_queries:
+        from evaluation.aqp_evaluation import evaluate_single_table_queries
+
+        evaluate_single_table_queries(args.ensemble_location, args.query_file_location, args.target_path, schema,
+                                      args.rdc_spn_selection, args.pairwise_rdc_path,
+                                      max_variants=args.max_variants,
+                                      merge_indicator_exp=args.merge_indicator_exp,
+                                      exploit_overlapping=args.exploit_overlapping, min_sample_ratio=0, debug=True,
+                                      show_confidence_intervals=args.confidence_intervals)
 
     # Read pre-trained ensemble and evaluate AQP queries
     if args.evaluate_aqp_queries:

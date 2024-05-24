@@ -3,6 +3,7 @@ import logging
 import math
 import pickle
 import random
+import sys
 
 import pandas as pd
 from spn.structure.StatisticalTypes import MetaType

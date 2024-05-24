@@ -100,7 +100,7 @@ def candidate_rdc_sum_means(pairwise_max_rdc, table_index_dict, ensemble_candida
 
 def candidate_evaluation(schema, meta_data_path, sample_size, spn_sample_size, max_table_data, ensemble_path,
                          physical_db_name, postsampling_factor, ensemble_budget_factor, max_no_joins, rdc_learn,
-                         pairwise_rdc_path, rdc_threshold=0.15, random_solutions=10000, bloom_filters=False,
+                         pairwise_rdc_path, rdc_threshold=0.3, random_solutions=10000, bloom_filters=False,
                          incremental_learning_rate=0, incremental_condition=None):
 
     assert incremental_learning_rate==0 or incremental_condition is None
@@ -354,4 +354,4 @@ def max_rdc(schema, left_table, right_table, df_samples, meta_types, rdc_attribu
         rdc_attribute_dict[(column_left, column_right)] = rdc
         rdc_attribute_dict[(column_right, column_left)] = rdc
 
-    return max(rdc_vals)
+    return max(rdc_vals, default=0)

@@ -21,7 +21,7 @@ def compute_ground_truth(query_filename, target_path, physical_db_name):
     :return:
     """
 
-    db_connection = DBConnection(db=physical_db_name)
+    # db_connection = DBConnection(db=physical_db_name)
 
     # read all queries
     with open(query_filename) as f:
@@ -29,13 +29,16 @@ def compute_ground_truth(query_filename, target_path, physical_db_name):
 
     csv_rows = []
     for query_no, query_str in enumerate(queries):
-        logger.debug(f"Computing ground truth for cardinality query {query_no}: {query_str}")
-        query_str = query_str.strip()
-        cardinality_true = db_connection.get_result(query_str)
+        query_s = query_str.split('||')[0]
+        true_card = int(query_str.split('||')[-1])
+        logger.debug(f"Computing ground truth for cardinality query {query_no}: {query_s}")
+        # query_str = query_str.strip()
+        query_str = query_s.strip()
+        # cardinality_true = db_connection.get_result(query_str)
 
         csv_rows.append({'query_no': query_no,
                          'query': query_str,
-                         'cardinality_true': cardinality_true})
+                         'cardinality_true': true_card})
 
     save_csv(csv_rows, target_path)
 
@@ -49,7 +52,7 @@ class GenCodeStats:
 
 def evaluate_cardinalities(ensemble_location, physical_db_name, query_filename, target_csv_path, schema,
                            rdc_spn_selection, pairwise_rdc_path, use_generated_code=False,
-                           true_cardinalities_path='./benchmarks/job-light/sql/job_light_true_cardinalities.csv',
+                           true_cardinalities_path=None,
                            max_variants=1, merge_indicator_exp=False, exploit_overlapping=False, min_sample_ratio=0):
     """
     Loads ensemble and evaluates cardinality for every query in query_filename
@@ -65,6 +68,7 @@ def evaluate_cardinalities(ensemble_location, physical_db_name, query_filename, 
     :param schema:
     :return:
     """
+    df_true_card = None
     if true_cardinalities_path is not None:
         df_true_card = pd.read_csv(true_cardinalities_path)
     else:

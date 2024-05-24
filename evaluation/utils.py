@@ -1,7 +1,7 @@
 import csv
 import logging
 import os
-
+import time
 import sqlparse
 from sqlparse.tokens import Token
 
@@ -139,6 +139,12 @@ def all_operations_of_type(type, query):
                 aggregation_operation_type == AggregationOperationType.AGGREGATION])
 
 
+def timestamp_transorform(time_string, start_date="2010-07-19 00:00:00"):
+    start_date_int = time.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+    time_array = time.strptime(time_string, "'%Y-%m-%d %H:%M:%S'")
+    return int(time.mktime(time_array)) - int(time.mktime(start_date_int))
+
+
 def parse_query(query_str, schema):
     """
     Parses simple SQL queries and returns cardinality query object.
@@ -148,13 +154,52 @@ def parse_query(query_str, schema):
     """
     query = Query(schema)
 
+    # stats语句修改
+    sql_segment = query_str.split(" ")
+    sql_before_produce = query_str.split(" ")
+    sql_after_produce = []
+    i = 0
+    while i < len(sql_before_produce):
+        if sql_before_produce[i] == "as":
+            # j = i
+            # while j < len(sql_segment)-1:
+            #     sql_segment[j] = sql_segment[j + 1]
+            #     j = j + 1
+            # sql_segment = sql_segment[:-1]
+
+            i = i + 2
+            continue
+
+            # if i == len(sql_segment) - 2:
+            #     sql_segment[i-1] = sql_segment[i-1] + ";"
+            #     sql_segment = sql_segment[:-2]
+            # else:
+                # sql_segment[i] = ''
+                # sql_segment[i+1] = ''
+                # i += 2
+                # continue
+
+        elif "." in sql_before_produce[i]:
+            index_point = sql_before_produce[i].index(".")
+            sql_before_produce[i] = sql_before_produce[i][index_point+1:]
+        if "::timestamp" in sql_before_produce[i]:
+            # print(timestamp_transorform(sql_before_produce[i-1].split('=')[1] + " " + sql_before_produce[i]).strip().split("::timestamp")[0])
+            sql_before_produce[i] = str(timestamp_transorform((sql_before_produce[i-1].split('=')[1] + " " + sql_before_produce[i]).strip().split("::timestamp")[0]))
+            sql_after_produce[-1]= sql_after_produce[-1].split("'")[0]
+        sql_after_produce.append(sql_before_produce[i])
+        i += 1
+
+
+    query_str = " ".join((sql_after_produce))
+    print(query_str)
     # split query into part before from
     parsed_tokens = sqlparse.parse(query_str)[0]
+    # print(f"parsed_tokens: {parsed_tokens}")
     from_idxs = [i for i, token in enumerate(parsed_tokens) if token.normalized == 'FROM']
     assert len(from_idxs) == 1, "Nested queries are currently not supported."
     from_idx = from_idxs[0]
     tokens_before_from = parsed_tokens[:from_idx]
-
+    # print(f"tokens_before_from: {tokens_before_from}")
     # split query into part after from and before group by
     group_by_idxs = [i for i, token in enumerate(parsed_tokens) if token.normalized == 'GROUP BY']
     assert len(group_by_idxs) == 0 or len(group_by_idxs) == 1, "Nested queries are currently not supported."
@@ -171,6 +216,7 @@ def parse_query(query_str, schema):
         group_by_attributes = _extract_identifiers(tokens_group_by, enforce_single=False)
     else:
         tokens_from_from = parsed_tokens[from_idx:]
+        # print(f"tokens_from_from: {tokens_from_from}")
 
     # Get identifier to obtain relevant tables
     identifiers = _extract_identifiers(tokens_from_from)
@@ -275,7 +321,7 @@ def parse_query(query_str, schema):
                                                                               return_split=True)
             left_part = left_table_name + '.' + left_attribute
             right = comparison.right
-
+            # print(f"right.tokens: {right}")
             # Join relationship
             if isinstance(right, sqlparse.sql.Identifier):
                 assert len(right.tokens) == 1, "Invalid Identifier"

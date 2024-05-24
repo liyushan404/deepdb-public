@@ -12,8 +12,9 @@ def read_table_csv(table_obj, csv_seperator=','):
     """
     Reads csv from path, renames columns and drops unnecessary columns
     """
-    df_rows = pd.read_csv(table_obj.csv_file_location, header=None, escapechar='\\', encoding='utf-8', quotechar='"',
-                          sep=csv_seperator)
+    df_rows = pd.read_csv(table_obj.csv_file_location)
+    # df_rows = pd.read_csv(table_obj.csv_file_location, header=None, escapechar='\\', encoding='utf-8', quotechar='"',
+    #                       sep=csv_seperator)
     df_rows.columns = [table_obj.table_name + '.' + attr for attr in table_obj.attributes]
 
     for attribute in table_obj.irrelevant_attributes:
@@ -101,6 +102,9 @@ def prepare_single_table(schema_graph, table, path, max_distinct_vals=10000, csv
             "Currently, only single primary keys are supported for table with incoming edges"
         table_primary_key = table + '.' + table_obj.primary_key[0]
         assert table_primary_key == left_attribute, "Currently, only references to primary key are supported"
+        # if table_primary_key != left_attribute:
+        #     print(table_primary_key, left_attribute)
+        #     print(table_primary_key != left_attribute)
 
         # fix for new pandas version
         table_data.index.name = None

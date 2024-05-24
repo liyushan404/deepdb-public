@@ -5,7 +5,7 @@ from enum import Enum
 class Table:
     """Represents a table with foreign key and primary key relationships"""
 
-    def __init__(self, table_name, primary_key=["id"], table_nn_attribute=None, table_size=1000, csv_file_location=None,
+    def __init__(self, table_name, primary_key=["Id"], table_nn_attribute=None, table_size=1000, csv_file_location=None,
                  attributes=None, irrelevant_attributes=None, keep_fk_attributes=None, sample_rate=1.0, fd_list=None,
                  no_compression=None):
 

@@ -4,8 +4,9 @@ import pickle
 from enum import Enum
 from time import perf_counter
 import numpy as np
-
+import matplotlib.pyplot as plt
 import math
+import pandas as pd
 
 from ensemble_compilation.physical_db import DBConnection
 from ensemble_compilation.spn_ensemble import read_ensemble
@@ -138,7 +139,7 @@ def evaluate_aqp_queries(ensemble_location, query_filename, target_path, schema,
             if isinstance(aqp_result, list):
 
                 average_relative_error, bin_completeness, false_bin_percentage, total_bins, \
-                confidence_interval_precision, confidence_interval_length, _ = \
+                    confidence_interval_precision, confidence_interval_length, _ = \
                     evaluate_group_by(aqp_result, true_result, confidence_intervals)
 
                 logger.info(f"\t\t{'total_bins: ':<32}{total_bins}")
@@ -184,6 +185,67 @@ def evaluate_aqp_queries(ensemble_location, query_filename, target_path, schema,
             logger.info(f"\t\tpredicted: {aqp_result}")
 
     save_csv(csv_rows, target_path)
+
+
+def evaluate_single_table_queries(ensemble_location, query_filename, target_path, schema,
+                                  rdc_spn_selection, pairwise_rdc_path, max_variants=5, merge_indicator_exp=False,
+                                  exploit_overlapping=False, min_sample_ratio=0, debug=False,
+                                  show_confidence_intervals=True):
+
+    spn_ensemble = read_ensemble(ensemble_location, build_reverse_dict=True)
+    predictions = []
+    q_errors = []
+    latencies = []
+    # read all queries
+    with open(query_filename) as f:
+        queries = f.readlines()
+
+    for query_no, query_str in enumerate(queries):
+        query_s = query_str.split('||')[0]
+        true_card = int(query_str.split('||')[-1])
+        # query_str = query_str.strip()
+        query_str = query_s.strip()
+        # query_str = query_str.strip()
+        logger.info(f"Evaluating query {query_no}: {query_str}")
+
+        query = parse_query(query_str.strip(), schema)
+
+        aqp_start_t = perf_counter()
+        confidence_intervals, aqp_result = spn_ensemble.evaluate_query(query, rdc_spn_selection=rdc_spn_selection,
+                                                                       pairwise_rdc_path=pairwise_rdc_path,
+                                                                       merge_indicator_exp=merge_indicator_exp,
+                                                                       max_variants=max_variants,
+                                                                       exploit_overlapping=exploit_overlapping,
+                                                                       debug=debug,
+                                                                       confidence_intervals=show_confidence_intervals)
+        aqp_end_t = perf_counter()
+        latency = aqp_end_t - aqp_start_t
+        print(aqp_result)
+        predictions.append(aqp_result)
+        q_errors.append(aqp_result / true_card)
+        latencies.append(latency * 1000)
+        logger.info(f"\t\t{'total_time:':<32}{latency} secs")
+
+    save_predictions_to_file(
+        predictions,
+        latencies,
+        "deepdb",
+        "deepdb-time",
+        "/home/lrr/Documents/research/card/results/stats/single_table/deepdb.csv",
+    )
+    print("=====================================================================================")
+    for i in [50, 90, 95, 99, 100]:
+        print(f"q-error {i}% percentile is {np.percentile(q_errors, i)}")
+    print(f"average latency is {np.mean(latencies)} ms")
+    print(np.sum(latencies))
+    # print(pre)
+    # print(len(pre))
+    # print(len(queries))
+    ratios = q_errors
+    logbins = np.logspace(np.log10(min(ratios)), np.log10(max(ratios)), 100)
+    plt.xscale("log")
+    plt.hist(ratios, bins=logbins)
+    plt.show()
 
 
 def evaluate_confidence_interval(confidence_interval, true_result, predicted):
@@ -236,3 +298,10 @@ def evaluate_group_by(aqp_result, true_result, confidence_intervals, medians=Fal
 
     max_error = math.inf if len(avg_relative_errors) == 0 else max(avg_relative_errors)
     return average_relative_error, bin_completeness, false_bin_percentage, total_bins, confidence_interval_precision, confidence_interval_length, max_error
+
+
+def save_predictions_to_file(preds, times, header1, header2, file_path):
+    data = zip(preds, times)
+    data = list(data)
+    df = pd.DataFrame(data, columns=[header1, header2])
+    df.to_csv(file_path, index=False)
